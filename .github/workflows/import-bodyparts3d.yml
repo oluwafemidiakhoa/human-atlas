@@ -1,0 +1,66 @@
+name: Import official BodyParts3D
+
+on:
+  push:
+    branches: [bodyparts3d-official-import]
+    paths:
+      - '.github/workflows/import-bodyparts3d.yml'
+      - 'scripts/build-bodyparts3d.py'
+      - 'scripts/verify-bodyparts3d.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bodyparts3d-official-import
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download official BodyParts3D 4.0 source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/bodyparts3d
+          base='https://dbarchive.biosciencedbc.jp/data/bodyparts3d/LATEST'
+          curl --fail --location --retry 5 --retry-delay 3 "$base/isa_BP3D_4.0_obj_99.zip" -o .cache/bodyparts3d/isa_BP3D_4.0_obj_99.zip
+          curl --fail --location --retry 5 --retry-delay 3 "$base/isa_parts_list_e.txt" -o .cache/bodyparts3d/isa_parts_list_e.txt
+          curl --fail --location --retry 5 --retry-delay 3 "$base/isa_inclusion_relation_list.txt" -o .cache/bodyparts3d/isa_inclusion_relation_list.txt
+          curl --fail --location --retry 5 --retry-delay 3 "$base/isa_element_parts.txt" -o .cache/bodyparts3d/isa_element_parts.txt
+
+      - name: Build browser anatomy package
+        run: |
+          rm -rf public/models
+          python scripts/build-bodyparts3d.py \
+            --archive .cache/bodyparts3d/isa_BP3D_4.0_obj_99.zip \
+            --isa-parts .cache/bodyparts3d/isa_parts_list_e.txt \
+            --isa-relations .cache/bodyparts3d/isa_inclusion_relation_list.txt \
+            --isa-elements .cache/bodyparts3d/isa_element_parts.txt \
+            --out public/models \
+            --expected-parts 2234
+
+      - name: Verify provenance and package integrity
+        run: python scripts/verify-bodyparts3d.py --models public/models --expected-parts 2234
+
+      - name: Commit verified generated anatomy assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/models
+          if git diff --cached --quiet; then
+            echo 'No generated asset changes.'
+            exit 0
+          fi
+          git commit -m 'data: import verified BodyParts3D 4.0 anatomy'
+          git push origin HEAD:bodyparts3d-official-import

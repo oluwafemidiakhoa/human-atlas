@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#ede7dc" />
-  <meta name="description" content="Human Atlas — Living Map. Explore, reveal, x-ray, relate, and trace human anatomy." />
-  <title>Human Atlas — Living Map</title>
+  <meta name="description" content="Human Atlas — Body Cartography. Explore 2,234 individually addressable anatomical structures in 3D." />
+  <title>Human Atlas — Body Cartography</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Libre+Caslon+Display&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css" />
   <script type="importmap">
   {
@@ -22,74 +22,106 @@
 </head>
 <body>
   <main id="app" class="app-shell">
-    <div id="scene" class="scene" aria-label="Interactive 3D anatomy prototype"></div>
+    <div id="scene" class="scene" aria-label="Interactive 3D anatomy"></div>
+    <div class="cartography-grid" aria-hidden="true"></div>
+    <div class="axis-mark axis-x" aria-hidden="true">X</div>
+    <div class="axis-mark axis-y" aria-hidden="true">Y</div>
 
     <header class="brand-block">
-      <div class="kicker"><span></span> HUMAN ATLAS</div>
-      <h1>Living Map</h1>
-      <p>Explore the architecture of being human.</p>
-      <div class="prototype-badge">Development shell · official anatomy package pending</div>
+      <div class="edition-line"><span>HUMAN ATLAS</span><b>01</b></div>
+      <div class="kicker">BODY CARTOGRAPHY / ADULT MALE REFERENCE</div>
+      <h1>Map the body.<br><em>Structure by structure.</em></h1>
+      <p>2,234 individually addressable anatomical meshes, arranged as an explorable spatial atlas.</p>
+      <div class="prototype-badge">Loading verified anatomy package…</div>
     </header>
 
     <div class="top-tools">
-      <button id="search-open" class="glass-button"><span class="tool-icon">⌕</span><span>Find anatomy</span><kbd>/</kbd></button>
-      <button id="about-open" class="glass-button icon-only" aria-label="About and provenance">i</button>
+      <button id="search-open" class="index-button">
+        <span class="index-mark">⌕</span>
+        <span><small>ATLAS INDEX</small><strong>Find any structure</strong></span>
+        <kbd>/</kbd>
+      </button>
+      <button id="about-open" class="round-button" aria-label="About and provenance">i</button>
     </div>
 
-    <button class="compass compass-head" data-focus="brain"><span>HEAD &amp; NECK</span><i></i></button>
-    <button class="compass compass-thorax" data-focus="heart"><span>THORAX</span><i></i></button>
-    <button class="compass compass-abdomen" data-focus="liver"><span>ABDOMEN</span><i></i></button>
-    <button class="compass compass-pelvis" data-focus="pelvis"><span>PELVIS</span><i></i></button>
+    <nav class="region-rail" aria-label="Body regions">
+      <div class="rail-title">BODY REGIONS</div>
+      <button class="compass compass-head" data-focus="brain"><b>01</b><span>Head &amp; neck</span><i></i></button>
+      <button class="compass compass-thorax" data-focus="heart"><b>02</b><span>Thorax</span><i></i></button>
+      <button class="compass compass-abdomen" data-focus="liver"><b>03</b><span>Abdomen</span><i></i></button>
+      <button class="compass compass-pelvis" data-focus="pelvis"><b>04</b><span>Pelvis</span><i></i></button>
+      <button class="compass" data-focus="femur"><b>05</b><span>Lower limb</span><i></i></button>
+    </nav>
 
-    <div id="labels-layer" class="labels-layer" aria-label="Living anatomy labels"></div>
+    <div class="atlas-stamp" aria-hidden="true">
+      <span>VERIFIED SOURCE</span>
+      <strong>2,234</strong>
+      <small>BODY PARTS</small>
+    </div>
+
+    <div id="labels-layer" class="labels-layer" aria-label="Adaptive anatomy labels"></div>
 
     <section id="structure-card" class="structure-card visible" aria-live="polite">
-      <div class="card-kicker">YOU ARE HERE</div>
+      <div class="coordinate-line"><span>CURRENT COORDINATE</span><b>●</b></div>
       <div class="card-heading">
-        <div><h2 id="structure-name">Heart</h2><p id="structure-meta">Cardiovascular · thorax</p></div>
+        <div>
+          <h2 id="structure-name">Heart</h2>
+          <p id="structure-meta">Cardiovascular · thorax</p>
+        </div>
         <button id="clear-selection" aria-label="Clear selection">×</button>
       </div>
       <p id="structure-summary" class="summary">Muscular pump at the center of the circulatory system.</p>
-      <div class="relation-strip"><span>Nearby</span><span>Connected</span><span>Function</span></div>
+      <div class="relation-strip"><span>Hierarchy</span><span>Context</span><span>Source ID</span></div>
       <div class="card-actions">
-        <button data-card-mode="reveal" class="active">◎ Reveal</button>
-        <button data-card-mode="xray">◐ X-Ray</button>
+        <button data-card-mode="reveal" class="active"><span>◎</span> Dissect</button>
+        <button data-card-mode="xray"><span>◐</span> Ghost</button>
       </div>
     </section>
 
     <section class="mode-dock" aria-label="Anatomy lenses">
+      <div class="deck-heading"><span>LENS DECK</span><small>Change how spatial context is shown</small></div>
       <div class="mode-row">
-        <button data-mode="explore"><span class="mode-glyph">◌</span><span>Explore</span></button>
-        <button data-mode="reveal" class="active"><span class="mode-glyph">◎</span><span>Reveal</span></button>
-        <button data-mode="xray"><span class="mode-glyph">◐</span><span>X-Ray</span></button>
-        <button data-mode="relate"><span class="mode-glyph">⌘</span><span>Relate</span></button>
-        <button data-mode="trace" disabled title="Trace activates after the curated relationship graph is installed"><span class="mode-glyph">↝</span><span>Trace</span></button>
+        <button data-mode="explore"><span class="mode-glyph">◌</span><span>Survey</span></button>
+        <button data-mode="reveal" class="active"><span class="mode-glyph">◎</span><span>Dissect</span></button>
+        <button data-mode="xray"><span class="mode-glyph">◐</span><span>Ghost</span></button>
+        <button data-mode="relate"><span class="mode-glyph">⌘</span><span>Lineage</span></button>
+        <button data-mode="trace" disabled title="Pathway mode activates after curated pathway data is installed"><span class="mode-glyph">↝</span><span>Pathway</span></button>
       </div>
       <div class="depth-row">
-        <div class="depth-title"><span>DEPTH</span><strong id="depth-output">42%</strong></div>
+        <div class="depth-title"><span>DISSECTION DEPTH</span><strong id="depth-output">42%</strong></div>
         <div class="slider-wrap"><label for="depth">Surface</label><input id="depth" type="range" min="0" max="100" value="42" /><label for="depth">Core</label></div>
       </div>
     </section>
 
-    <button id="labels-toggle" class="labels-toggle active"><span>◉</span> Living labels</button>
-    <div class="interaction-note">✥ Drag to orbit · Scroll to zoom · Click anatomy to inspect</div>
+    <button id="labels-toggle" class="labels-toggle active"><span>◉</span><span>Label field</span></button>
+    <div class="interaction-note"><span>DRAG</span> orbit <b>·</b> <span>SCROLL</span> zoom <b>·</b> <span>CLICK</span> inspect</div>
 
     <div id="search-modal" class="modal-backdrop" hidden>
       <section class="search-sheet" role="dialog" aria-modal="true" aria-labelledby="search-title">
-        <div class="sheet-title"><div><span>FIND</span><h2 id="search-title">Navigate by anatomy</h2></div><button data-close="search" aria-label="Close">×</button></div>
-        <div class="search-field"><span>⌕</span><input id="search-input" autocomplete="off" placeholder="Heart, brain, kidney, femur…" /></div>
+        <div class="sheet-title">
+          <div><span>COMPLETE ATLAS INDEX</span><h2 id="search-title">Every structure has an address.</h2></div>
+          <button data-close="search" aria-label="Close">×</button>
+        </div>
+        <div class="search-field"><span>⌕</span><input id="search-input" autocomplete="off" placeholder="Search heart, vagus, femur, FMA ID…" /></div>
         <div id="search-results" class="search-results"></div>
-        <p class="sheet-note">This prototype searches the temporary interaction set. The production model will index every imported BodyParts3D structure.</p>
+        <p class="sheet-note">Search spans the verified BodyParts3D mesh names and mapped concept identifiers. Labels on the 3D body are adaptive so the atlas stays readable as you zoom.</p>
       </section>
     </div>
 
     <div id="about-modal" class="modal-backdrop" hidden>
       <section class="about-sheet" role="dialog" aria-modal="true" aria-labelledby="about-title">
-        <div class="sheet-title"><div><span>SOURCE &amp; SCOPE</span><h2 id="about-title">Built for independent learning</h2></div><button data-close="about" aria-label="Close">×</button></div>
-        <p><strong>This branch is an interaction prototype.</strong> Its simple geometry is intentionally not presented as the final anatomical dataset.</p>
-        <p>The production viewer is designed to ingest BodyParts3D geometry and identifiers with explicit source attribution and license metadata.</p>
-        <p>Human Atlas is independently designed around five verbs: <b>Explore, Reveal, X-Ray, Relate, Trace.</b> It does not reproduce the layout, wording, or signature interface of a third-party anatomy application.</p>
-        <div class="source-box"><span>INTENDED ANATOMY SOURCE</span><strong>BodyParts3D · Database Center for Life Science</strong><small>Geometry integration pending in this branch.</small></div>
+        <div class="sheet-title">
+          <div><span>SOURCE / PROVENANCE / SCOPE</span><h2 id="about-title">A spatial atlas, not a copied interface.</h2></div>
+          <button data-close="about" aria-label="Close">×</button>
+        </div>
+        <p><strong>Human Atlas — Body Cartography</strong> is an independently designed anatomy-learning interface. Its interaction language is built around spatial mapping: Survey, Dissect, Ghost, Lineage and Pathway.</p>
+        <p>The geometry package is the official BodyParts3D 4.0 adult male reference anatomy. Every imported source mesh remains individually addressable, while on-screen labels are decluttered dynamically instead of showing 2,234 names at once.</p>
+        <p>This experience is educational and is not a diagnostic or clinical decision-support tool.</p>
+        <div class="source-box">
+          <span>ANATOMY SOURCE</span>
+          <strong>BodyParts3D · Database Center for Life Science</strong>
+          <small>CC BY 4.0 · required attribution retained in the project provenance files.</small>
+        </div>
       </section>
     </div>
   </main>

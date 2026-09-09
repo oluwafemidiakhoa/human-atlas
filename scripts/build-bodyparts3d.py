@@ -1,107 +1,396 @@
 #!/usr/bin/env python3
-import argparse,csv,gzip,hashlib,json,math,re,sys,zipfile
+import argparse
+import csv
+import gzip
+import hashlib
+import json
+import math
+import re
+import sys
+import zipfile
 from array import array
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
-ATTR='BodyParts3D, © The Database Center for Life Science licensed under CC Attribution 4.0 International'
-SYS={'skeletal':'#d8cfb6','muscular':'#a85b50','arterial':'#b95345','venous':'#527c9f','nervous':'#d8b565','respiratory':'#b98991','digestive':'#b8916b','urinary':'#88738f','reproductive':'#bda098','lymphatic':'#879f7c','endocrine':'#c5a09a','sensory':'#91aeb2','cardiac':'#9d4f45','connective':'#aec3bb','integumentary':'#ba9b7d','other':'#9da5a3'}
-KW=[('cardiac',['heart','ventricle','atrium','cardiac valve']),('arterial',['artery','aorta']),('venous',['vein','vena cava']),('nervous',['nerve','brain','spinal cord','ganglion','plexus','cerebell','medulla','pons']),('skeletal',['bone','vertebra','rib','femur','tibia','fibula','humerus','radius','ulna','skull','mandible','maxilla','sternum','sacrum','coccyx','patella','carpal','tarsal','metacarp','metatars','phalan','scapula','clavicle']),('muscular',['muscle','diaphragm']),('respiratory',['lung','bronch','trachea','larynx','alveol']),('digestive',['stomach','intestin','colon','rectum','esophagus','liver','gallbladder','pancreas','duodenum','jejun','ileum','bile duct']),('urinary',['kidney','ureter','bladder','urethra']),('reproductive',['testis','prostate','penis','seminal','epididym','spermatic']),('lymphatic',['lymph','spleen','thymus','tonsil']),('endocrine',['adrenal','pituitary','thyroid','parathyroid','pineal']),('sensory',['eye','retina','optic','ear','cochlea','vestib','lens','cornea']),('integumentary',['skin']),('connective',['cartilage','ligament','tendon','fascia'])]
+ATTR = 'BodyParts3D, © The Database Center for Life Science licensed under CC Attribution 4.0 International'
+SYS = {
+    'skeletal': '#d8cfb6', 'muscular': '#a85b50', 'arterial': '#b95345',
+    'venous': '#527c9f', 'nervous': '#d8b565', 'respiratory': '#b98991',
+    'digestive': '#b8916b', 'urinary': '#88738f', 'reproductive': '#bda098',
+    'lymphatic': '#879f7c', 'endocrine': '#c5a09a', 'sensory': '#91aeb2',
+    'cardiac': '#9d4f45', 'connective': '#aec3bb', 'integumentary': '#ba9b7d',
+    'other': '#9da5a3'
+}
+KW = [
+    ('cardiac', ['heart', 'ventricle', 'atrium', 'cardiac valve']),
+    ('arterial', ['artery', 'aorta']),
+    ('venous', ['vein', 'vena cava']),
+    ('nervous', ['nerve', 'brain', 'spinal cord', 'ganglion', 'plexus', 'cerebell', 'medulla', 'pons']),
+    ('skeletal', ['bone', 'vertebra', 'rib', 'femur', 'tibia', 'fibula', 'humerus', 'radius', 'ulna', 'skull', 'mandible', 'maxilla', 'sternum', 'sacrum', 'coccyx', 'patella', 'carpal', 'tarsal', 'metacarp', 'metatars', 'phalan', 'scapula', 'clavicle']),
+    ('muscular', ['muscle', 'diaphragm']),
+    ('respiratory', ['lung', 'bronch', 'trachea', 'larynx', 'alveol']),
+    ('digestive', ['stomach', 'intestin', 'colon', 'rectum', 'esophagus', 'liver', 'gallbladder', 'pancreas', 'duodenum', 'jejun', 'ileum', 'bile duct']),
+    ('urinary', ['kidney', 'ureter', 'bladder', 'urethra']),
+    ('reproductive', ['testis', 'prostate', 'penis', 'seminal', 'epididym', 'spermatic']),
+    ('lymphatic', ['lymph', 'spleen', 'thymus', 'tonsil']),
+    ('endocrine', ['adrenal', 'pituitary', 'thyroid', 'parathyroid', 'pineal']),
+    ('sensory', ['eye', 'retina', 'optic', 'ear', 'cochlea', 'vestib', 'lens', 'cornea']),
+    ('integumentary', ['skin']),
+    ('connective', ['cartilage', 'ligament', 'tendon', 'fascia'])
+]
 
-def rows(p):
- with open(p,encoding='utf-8-sig',errors='replace',newline='') as f:return [[c.strip() for c in r] for r in csv.reader(f,delimiter='\t') if r]
-def h(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
-def arr(vals,code):
- a=array(code,vals)
- if sys.byteorder!='little':a.byteswap()
- return a.tobytes()
-def meta(parts,rels,elems):
- C={}; parent={}; child=defaultdict(list); E=defaultdict(list)
- for r in rows(parts)[1:]:
-  if len(r)>=3:C[r[0]]={'id':r[0],'representationId':r[1],'name':r[2],'elements':[]}
- for r in rows(rels)[1:]:
-  if len(r)>=4:parent[r[2]]=r[0];child[r[0]].append(r[2]);C.setdefault(r[0],{'id':r[0],'representationId':'','name':r[1],'elements':[]});C.setdefault(r[2],{'id':r[2],'representationId':'','name':r[3],'elements':[]})
- for r in rows(elems)[1:]:
-  if len(r)>=3:C.setdefault(r[0],{'id':r[0],'representationId':'','name':r[1],'elements':[]})['elements'].append(r[2]);E[r[2].upper()].append(r[0])
- D={}
- def depth(x,seen=None):
-  if x in D:return D[x]
-  seen=set() if seen is None else seen
-  if x in seen:return 0
-  seen.add(x);D[x]=0 if x not in parent else depth(parent[x],seen)+1;return D[x]
- def choose(e):return max(E.get(e.upper(),[]),key=lambda x:depth(x),default=None)
- def lineage(cid):
-  out=[];seen=set()
-  while cid and cid not in seen:seen.add(cid);out.append(C.get(cid,{}).get('name',''));cid=parent.get(cid)
-  return out
- concepts=[dict(v,parentId=parent.get(k),children=child.get(k,[])) for k,v in sorted(C.items())]
- return concepts,choose,lineage
 
-def system(name,line):
- s=' | '.join([name,*line]).lower()
- for k,words in KW:
-  if any(w in s for w in words):return k
- return 'other'
-def scan_bounds(z,members):
- lo=[1e9]*3;hi=[-1e9]*3
- for m in members:
-  for b in z.open(m):
-   if b.startswith(b'v '):
-    q=b.decode('ascii','ignore').split();x,y,z0=map(float,q[1:4]);p=(x*.001,z0*.001,-y*.001)
-    for i in range(3):lo[i]=min(lo[i],p[i]);hi[i]=max(hi[i],p[i])
- return lo,hi
-def parse_obj(txt,raw):
- pos=[];norm=[];faces=[];name='';lo,hi=raw;cx=(lo[0]+hi[0])/2;cz=(lo[2]+hi[2])/2
- for ln in txt.splitlines():
-  if ln.startswith('#') and 'english name' in ln.lower() and ':' in ln:name=ln.split(':',1)[1].strip()
-  elif ln.startswith('v '):x,y,z=map(float,ln.split()[1:4]);pos.append((x*.001-cx,z*.001-lo[1],-y*.001-cz))
-  elif ln.startswith('vn '):x,y,z=map(float,ln.split()[1:4]);n=(x,z,-y);L=math.sqrt(sum(v*v for v in n)) or 1;norm.append(tuple(v/L for v in n))
-  elif ln.startswith('f '):
-   f=[]
-   for tok in ln.split()[1:]:
-    q=tok.split('/');vi=int(q[0]);vi=vi-1 if vi>0 else len(pos)+vi;ni=None
-    if len(q)>2 and q[2]:ni=int(q[2]);ni=ni-1 if ni>0 else len(norm)+ni
-    f.append((vi,ni))
-   faces.append(f)
- have=bool(norm) and any(n is not None for f in faces for _,n in f);mp={};P=[];N=[];I=[]
- def V(ref):
-  key=ref if have else (ref[0],None)
-  if key in mp:return mp[key]
-  i=len(P)//3;mp[key]=i;P.extend(pos[ref[0]]);n=norm[ref[1]] if have and ref[1] is not None else (0,0,0);N.extend(n);return i
- for f in faces:
-  ff=[V(r) for r in f]
-  for j in range(1,len(ff)-1):I.extend((ff[0],ff[j],ff[j+1]))
- if not have:
-  A=[0.0]*len(P)
-  for k in range(0,len(I),3):
-   ia,ib,ic=I[k:k+3];a=P[3*ia:3*ia+3];b=P[3*ib:3*ib+3];c=P[3*ic:3*ic+3];u=[b[j]-a[j] for j in range(3)];v=[c[j]-a[j] for j in range(3)];n=(u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0])
-   for ii in (ia,ib,ic):
-    for j in range(3):A[3*ii+j]+=n[j]
-  N=[]
-  for k in range(0,len(A),3):q=A[k:k+3];L=math.sqrt(sum(v*v for v in q)) or 1;N.extend(v/L for v in q)
- b=[[min(P[i::3]) for i in range(3)],[max(P[i::3]) for i in range(3)]]
- return name,P,N,I,b
-def region(c,B):
- lo,hi=B;y=(c[1]-lo[1])/(hi[1]-lo[1]);x=abs(c[0]-(lo[0]+hi[0])/2)/(hi[0]-lo[0])
- return 'head & neck' if y>=.79 else 'upper limb' if x>.30 and .34<=y<.78 else 'thorax' if y>=.56 else 'abdomen' if y>=.39 else 'pelvis' if y>=.29 else 'lower limb'
+def rows(path):
+    with open(path, encoding='utf-8-sig', errors='replace', newline='') as handle:
+        return [[cell.strip() for cell in row] for row in csv.reader(handle, delimiter='\t') if row]
+
+
+def sha256(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def packed(values, code):
+    result = array(code, values)
+    if sys.byteorder != 'little':
+        result.byteswap()
+    return result.tobytes()
+
+
+def metadata(parts_path, relations_path, elements_path):
+    concepts = {}
+    parent = {}
+    children = defaultdict(list)
+    element_to_concepts = defaultdict(list)
+
+    for row in rows(parts_path)[1:]:
+        if len(row) >= 3:
+            concepts[row[0]] = {'id': row[0], 'representationId': row[1], 'name': row[2], 'elements': []}
+
+    for row in rows(relations_path)[1:]:
+        if len(row) >= 4:
+            parent[row[2]] = row[0]
+            children[row[0]].append(row[2])
+            concepts.setdefault(row[0], {'id': row[0], 'representationId': '', 'name': row[1], 'elements': []})
+            concepts.setdefault(row[2], {'id': row[2], 'representationId': '', 'name': row[3], 'elements': []})
+
+    for row in rows(elements_path)[1:]:
+        if len(row) >= 3:
+            concepts.setdefault(row[0], {'id': row[0], 'representationId': '', 'name': row[1], 'elements': []})['elements'].append(row[2])
+            element_to_concepts[row[2].upper()].append(row[0])
+
+    depth_cache = {}
+
+    def depth(concept_id, seen=None):
+        if concept_id in depth_cache:
+            return depth_cache[concept_id]
+        seen = set() if seen is None else seen
+        if concept_id in seen:
+            return 0
+        seen.add(concept_id)
+        depth_cache[concept_id] = 0 if concept_id not in parent else depth(parent[concept_id], seen) + 1
+        return depth_cache[concept_id]
+
+    def choose(element_id):
+        return max(element_to_concepts.get(element_id.upper(), []), key=depth, default=None)
+
+    def lineage(concept_id):
+        result = []
+        seen = set()
+        while concept_id and concept_id not in seen:
+            seen.add(concept_id)
+            result.append(concepts.get(concept_id, {}).get('name', ''))
+            concept_id = parent.get(concept_id)
+        return result
+
+    packed_concepts = [dict(value, parentId=parent.get(key), children=children.get(key, [])) for key, value in sorted(concepts.items())]
+    return packed_concepts, choose, lineage
+
+
+def system_for(name, lineage):
+    text = ' | '.join([name, *lineage]).lower()
+    for system_id, words in KW:
+        if any(word in text for word in words):
+            return system_id
+    return 'other'
+
+
+def scan_bounds(archive, members):
+    low = [1e9] * 3
+    high = [-1e9] * 3
+    for member in members:
+        for raw_line in archive.open(member):
+            if raw_line.startswith(b'v '):
+                fields = raw_line.decode('ascii', 'ignore').split()
+                x, y, z = map(float, fields[1:4])
+                point = (x * .001, z * .001, -y * .001)
+                for axis in range(3):
+                    low[axis] = min(low[axis], point[axis])
+                    high[axis] = max(high[axis], point[axis])
+    return low, high
+
+
+def parse_obj(text, raw_bounds):
+    positions = []
+    normals = []
+    faces = []
+    english_name = ''
+    low, high = raw_bounds
+    center_x = (low[0] + high[0]) / 2
+    center_z = (low[2] + high[2]) / 2
+
+    for line in text.splitlines():
+        if line.startswith('#') and 'english name' in line.lower() and ':' in line:
+            english_name = line.split(':', 1)[1].strip()
+        elif line.startswith('v '):
+            x, y, z = map(float, line.split()[1:4])
+            positions.append((x * .001 - center_x, z * .001 - low[1], -y * .001 - center_z))
+        elif line.startswith('vn '):
+            x, y, z = map(float, line.split()[1:4])
+            normal = (x, z, -y)
+            length = math.sqrt(sum(value * value for value in normal)) or 1
+            normals.append(tuple(value / length for value in normal))
+        elif line.startswith('f '):
+            face = []
+            for token in line.split()[1:]:
+                fields = token.split('/')
+                vertex_index = int(fields[0])
+                vertex_index = vertex_index - 1 if vertex_index > 0 else len(positions) + vertex_index
+                normal_index = None
+                if len(fields) > 2 and fields[2]:
+                    normal_index = int(fields[2])
+                    normal_index = normal_index - 1 if normal_index > 0 else len(normals) + normal_index
+                face.append((vertex_index, normal_index))
+            faces.append(face)
+
+    have_normals = bool(normals) and any(normal_index is not None for face in faces for _, normal_index in face)
+    vertex_map = {}
+    packed_positions = []
+    packed_normals = []
+    indices = []
+
+    def vertex(reference):
+        key = reference if have_normals else (reference[0], None)
+        if key in vertex_map:
+            return vertex_map[key]
+        result = len(packed_positions) // 3
+        vertex_map[key] = result
+        packed_positions.extend(positions[reference[0]])
+        normal = normals[reference[1]] if have_normals and reference[1] is not None else (0, 0, 0)
+        packed_normals.extend(normal)
+        return result
+
+    for face in faces:
+        face_indices = [vertex(reference) for reference in face]
+        for index in range(1, len(face_indices) - 1):
+            indices.extend((face_indices[0], face_indices[index], face_indices[index + 1]))
+
+    if not have_normals:
+        accumulated = [0.0] * len(packed_positions)
+        for offset in range(0, len(indices), 3):
+            ia, ib, ic = indices[offset:offset + 3]
+            a = packed_positions[3 * ia:3 * ia + 3]
+            b = packed_positions[3 * ib:3 * ib + 3]
+            c = packed_positions[3 * ic:3 * ic + 3]
+            u = [b[i] - a[i] for i in range(3)]
+            v = [c[i] - a[i] for i in range(3)]
+            normal = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+            for vertex_index in (ia, ib, ic):
+                for axis in range(3):
+                    accumulated[3 * vertex_index + axis] += normal[axis]
+        packed_normals = []
+        for offset in range(0, len(accumulated), 3):
+            normal = accumulated[offset:offset + 3]
+            length = math.sqrt(sum(value * value for value in normal)) or 1
+            packed_normals.extend(value / length for value in normal)
+
+    bounds = [
+        [min(packed_positions[axis::3]) for axis in range(3)],
+        [max(packed_positions[axis::3]) for axis in range(3)]
+    ]
+    return english_name, packed_positions, packed_normals, indices, bounds
+
+
+def region_for(center, body_bounds):
+    low, high = body_bounds
+    y = (center[1] - low[1]) / (high[1] - low[1])
+    x = abs(center[0] - (low[0] + high[0]) / 2) / (high[0] - low[0])
+    if y >= .79:
+        return 'head & neck'
+    if x > .30 and .34 <= y < .78:
+        return 'upper limb'
+    if y >= .56:
+        return 'thorax'
+    if y >= .39:
+        return 'abdomen'
+    if y >= .29:
+        return 'pelvis'
+    return 'lower limb'
+
 
 def main():
- a=argparse.ArgumentParser();a.add_argument('--archive',required=True);a.add_argument('--isa-parts',required=True);a.add_argument('--isa-relations',required=True);a.add_argument('--isa-elements',required=True);a.add_argument('--out',default='public/models');a.add_argument('--expected-parts',type=int,default=2234);A=a.parse_args();out=Path(A.out);out.mkdir(parents=True,exist_ok=True)
- concepts,choose,lineage=meta(A.isa_parts,A.isa_relations,A.isa_elements);CB={c['id']:c for c in concepts}
- with zipfile.ZipFile(A.archive) as z:
-  members=sorted(m for m in z.namelist() if m.lower().endswith('.obj'));assert len(members)==A.expected_parts,(len(members),A.expected_parts);raw=scan_bounds(z,members);lo,hi=raw;B=[[-(hi[0]-lo[0])/2,0,-(hi[2]-lo[2])/2],[(hi[0]-lo[0])/2,hi[1]-lo[1],(hi[2]-lo[2])/2]];parts=[];chunks=[];stats=defaultdict(lambda:{'parts':0,'vertices':0,'indices':0});blob=bytearray();ci=0;tri=0
-  def flush():
-   nonlocal blob,ci
-   if not blob:return
-   fn=out/f'body-{ci}.bin.gz';fn.write_bytes(gzip.compress(bytes(blob),compresslevel=9,mtime=0));chunks.append({'url':f'/models/{fn.name}','bytes':len(blob),'gzipBytes':fn.stat().st_size,'sha256':h(fn)});ci+=1;blob=bytearray()
-  for n,m in enumerate(members,1):
-   eid=(re.search(r'FJ\d+',Path(m).stem,re.I).group(0) if re.search(r'FJ\d+',Path(m).stem,re.I) else Path(m).stem).upper();nm,P,N,I,b=parse_obj(z.read(m).decode('utf-8','replace'),raw);cid=choose(eid);nm=nm or CB.get(cid,{}).get('name') or eid;sysid=system(nm,lineage(cid));c=[(b[0][i]+b[1][i])/2 for i in range(3)];pb=arr(P,'f');nb=arr([max(-32767,min(32767,round(x*32767))) for x in N],'h');ib=arr(I,'I')
-   if blob and len(blob)+len(pb)+len(nb)+len(ib)>6_000_000:flush()
-   def add(x):
-    while len(blob)%4:blob.append(0)
-    o=len(blob);blob.extend(x);return o
-   po,no,io=add(pb),add(nb),add(ib);p={'id':eid,'name':nm,'conceptId':cid,'system':sysid,'region':region(c,B),'chunk':ci,'positions':po,'normals':no,'indices':io,'vertexCount':len(P)//3,'indexCount':len(I),'bounds':b};parts.append(p);tri+=len(I)//3;s=stats[sysid];s['parts']+=1;s['vertices']+=p['vertexCount'];s['indices']+=p['indexCount']
-   if n%100==0:print(f'{n}/{len(members)}')
-  flush()
- atlas={'version':'BodyParts3D 4.0','sex':'male','scope':'adult human male reference anatomy','source':'BodyParts3D','license':'CC BY 4.0','attribution':ATTR,'parts':parts,'concepts':concepts,'chunks':chunks,'triangles':tri,'bounds':B,'systemColors':SYS,'systemStats':dict(stats),'classification':{'system':'Human Atlas heuristic v1; not an official BodyParts3D field','region':'Human Atlas geometric heuristic v1; not an official BodyParts3D field'}}; (out/'atlas.json').write_text(json.dumps(atlas,separators=(',',':')),encoding='utf-8');(out/'source.json').write_text(json.dumps({'dataset':'BodyParts3D','release':'4.0','modelCount':len(parts),'archiveSha256':h(A.archive),'license':'Creative Commons Attribution 4.0 International','attribution':ATTR,'licensePage':'https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html','downloadPage':'https://dbarchive.biosciencedbc.jp/en/bodyparts3d/download.html','transform':'millimetres/Z-up -> metres/Y-up; centered X/Z; grounded Y=0'},indent=2),encoding='utf-8');print(json.dumps({'parts':len(parts),'triangles':tri,'chunks':len(chunks),'bytes':sum(c['gzipBytes'] for c in chunks)},indent=2))
-if __name__=='__main__':main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--archive', required=True)
+    parser.add_argument('--isa-parts', required=True)
+    parser.add_argument('--isa-relations', required=True)
+    parser.add_argument('--isa-elements', required=True)
+    parser.add_argument('--out', default='public/models')
+    parser.add_argument('--expected-parts', type=int, default=2234)
+    args = parser.parse_args()
+
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    concepts, choose_concept, lineage = metadata(args.isa_parts, args.isa_relations, args.isa_elements)
+    concept_by_id = {concept['id']: concept for concept in concepts}
+
+    with zipfile.ZipFile(args.archive) as archive:
+        members = sorted(member for member in archive.namelist() if member.lower().endswith('.obj'))
+        assert len(members) == args.expected_parts, (len(members), args.expected_parts)
+
+        raw_bounds = scan_bounds(archive, members)
+        low, high = raw_bounds
+        body_bounds = [
+            [-(high[0] - low[0]) / 2, 0, -(high[2] - low[2]) / 2],
+            [(high[0] - low[0]) / 2, high[1] - low[1], (high[2] - low[2]) / 2]
+        ]
+
+        parts = []
+        chunks = []
+        stats = defaultdict(lambda: {'parts': 0, 'vertices': 0, 'indices': 0})
+        blob = bytearray()
+        chunk_index = 0
+        triangle_count = 0
+        used_mesh_ids = set()
+        element_counts = Counter()
+
+        def flush():
+            nonlocal blob, chunk_index
+            if not blob:
+                return
+            filename = out / f'body-{chunk_index}.bin.gz'
+            filename.write_bytes(gzip.compress(bytes(blob), compresslevel=9, mtime=0))
+            chunks.append({
+                'url': f'/models/{filename.name}',
+                'bytes': len(blob),
+                'gzipBytes': filename.stat().st_size,
+                'sha256': sha256(filename)
+            })
+            chunk_index += 1
+            blob = bytearray()
+
+        for ordinal, member in enumerate(members, 1):
+            source_stem = Path(member).stem.upper()
+            match = re.search(r'FJ\d+', source_stem, re.I)
+            element_id = (match.group(0) if match else source_stem).upper()
+            element_counts[element_id] += 1
+
+            # An FJ element can legitimately be represented by more than one OBJ entry.
+            # Keep the ontology lookup key in elementId and give every archive mesh its own stable id.
+            mesh_id = source_stem
+            if mesh_id in used_mesh_ids:
+                suffix = hashlib.sha1(member.encode('utf-8')).hexdigest()[:10].upper()
+                mesh_id = f'{source_stem}__{suffix}'
+            if mesh_id in used_mesh_ids:
+                raise AssertionError(f'Unable to make a unique mesh id for {member}')
+            used_mesh_ids.add(mesh_id)
+
+            english_name, positions, normals, indices, bounds = parse_obj(
+                archive.read(member).decode('utf-8', 'replace'), raw_bounds
+            )
+            concept_id = choose_concept(element_id)
+            name = english_name or concept_by_id.get(concept_id, {}).get('name') or element_id
+            system_id = system_for(name, lineage(concept_id))
+            center = [(bounds[0][axis] + bounds[1][axis]) / 2 for axis in range(3)]
+
+            position_bytes = packed(positions, 'f')
+            normal_bytes = packed([max(-32767, min(32767, round(value * 32767))) for value in normals], 'h')
+            index_bytes = packed(indices, 'I')
+
+            if blob and len(blob) + len(position_bytes) + len(normal_bytes) + len(index_bytes) > 6_000_000:
+                flush()
+
+            def append(data):
+                while len(blob) % 4:
+                    blob.append(0)
+                offset = len(blob)
+                blob.extend(data)
+                return offset
+
+            position_offset = append(position_bytes)
+            normal_offset = append(normal_bytes)
+            index_offset = append(index_bytes)
+            part = {
+                'id': mesh_id,
+                'elementId': element_id,
+                'sourceFile': member,
+                'name': name,
+                'conceptId': concept_id,
+                'system': system_id,
+                'region': region_for(center, body_bounds),
+                'chunk': chunk_index,
+                'positions': position_offset,
+                'normals': normal_offset,
+                'indices': index_offset,
+                'vertexCount': len(positions) // 3,
+                'indexCount': len(indices),
+                'bounds': bounds
+            }
+            parts.append(part)
+            triangle_count += len(indices) // 3
+            system_stats = stats[system_id]
+            system_stats['parts'] += 1
+            system_stats['vertices'] += part['vertexCount']
+            system_stats['indices'] += part['indexCount']
+
+            if ordinal % 100 == 0:
+                print(f'{ordinal}/{len(members)}')
+
+        flush()
+
+    duplicate_elements = {key: value for key, value in sorted(element_counts.items()) if value > 1}
+    atlas = {
+        'version': 'BodyParts3D 4.0',
+        'sex': 'male',
+        'scope': 'adult human male reference anatomy',
+        'source': 'BodyParts3D',
+        'license': 'CC BY 4.0',
+        'attribution': ATTR,
+        'parts': parts,
+        'concepts': concepts,
+        'chunks': chunks,
+        'triangles': triangle_count,
+        'bounds': body_bounds,
+        'systemColors': SYS,
+        'systemStats': dict(stats),
+        'classification': {
+            'system': 'Human Atlas heuristic v1; not an official BodyParts3D field',
+            'region': 'Human Atlas geometric heuristic v1; not an official BodyParts3D field'
+        }
+    }
+    (out / 'atlas.json').write_text(json.dumps(atlas, separators=(',', ':')), encoding='utf-8')
+    (out / 'source.json').write_text(json.dumps({
+        'dataset': 'BodyParts3D',
+        'release': '4.0',
+        'modelCount': len(parts),
+        'archiveSha256': sha256(args.archive),
+        'license': 'Creative Commons Attribution 4.0 International',
+        'attribution': ATTR,
+        'licensePage': 'https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html',
+        'downloadPage': 'https://dbarchive.biosciencedbc.jp/en/bodyparts3d/download.html',
+        'transform': 'millimetres/Z-up -> metres/Y-up; centered X/Z; grounded Y=0',
+        'meshIdentityPolicy': 'id identifies an individual source OBJ; elementId preserves the BodyParts3D/FJ ontology lookup key',
+        'duplicateElementIdCount': len(duplicate_elements),
+        'duplicateElementIds': duplicate_elements
+    }, indent=2), encoding='utf-8')
+
+    print(json.dumps({
+        'parts': len(parts),
+        'uniqueMeshIds': len(used_mesh_ids),
+        'duplicateElementIds': len(duplicate_elements),
+        'triangles': triangle_count,
+        'chunks': len(chunks),
+        'bytes': sum(chunk['gzipBytes'] for chunk in chunks)
+    }, indent=2))
+
+
+if __name__ == '__main__':
+    main()

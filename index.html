@@ -8,6 +8,7 @@
   <title>Human Atlas — Interactive Anatomy</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/startup-guard.css?v=1" />
   <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
 </head>
 <body>
@@ -60,7 +61,7 @@
 
   <footer class="studio-footer"><span id="interaction-hint">Drag to orbit · Pinch to zoom · Tap to inspect</span><button id="credits-open">Source &amp; credits ↗</button></footer>
 
-  <div id="loading" class="loading glass"><span class="spinner"></span><div><strong>Preparing the anatomy</strong><small id="loading-copy">Loading 2,234 pieces</small><div class="loading-track"><i id="loading-bar"></i></div></div></div>
+  <div id="loading" class="loading glass"><span class="spinner"></span><div><strong>Preparing the anatomy</strong><small id="loading-copy">Loading 2,234 pieces</small><div class="loading-track"><i id="loading-bar"></i></div><div id="loading-action"></div></div></div>
 
   <aside id="detail" class="detail-sheet glass" aria-live="polite">
     <button id="detail-close" class="detail-close" aria-label="Close">×</button>
@@ -92,6 +93,7 @@
     </section>
   </div>
 </main>
+<script src="/startup-guard.js?v=1"></script>
 <script type="module" src="/app.js"></script>
 </body>
 </html>

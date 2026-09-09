@@ -1,0 +1,1 @@
+.loading[hidden]{display:none!important}.loading.error{border-color:rgba(185,83,69,.28)}.loading.error .spinner{border-top-color:#b95345}.loading.error .loading-track i{background:#b95345}.loading-retry{margin-top:9px;border:1px solid rgba(62,79,90,.16);background:#fff;border-radius:7px;padding:6px 9px;font-size:9px;color:#41525d;cursor:pointer}

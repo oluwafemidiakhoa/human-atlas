@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#f2f3f3" />
+  <meta name="theme-color" content="#eef1f2" />
   <meta name="description" content="Human Atlas — explore 2,234 individually addressable BodyParts3D anatomical meshes in 3D." />
   <title>Human Atlas — Interactive Anatomy</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="/styles.css" />
   <link rel="stylesheet" href="/startup-guard.css?v=1" />
+  <link rel="stylesheet" href="/wow-pass.css?v=1" />
   <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
 </head>
 <body>
@@ -23,6 +24,7 @@
   </header>
 
   <nav class="top-actions" aria-label="Explorer actions">
+    <button id="showcase" class="showcase-button"><span class="showcase-orb"></span><span>Showcase</span><small>PLAY</small></button>
     <button id="search-open" class="search-button">⌕ <span>Find a structure</span><kbd>/</kbd></button>
     <button id="about-open" class="icon-button" aria-label="Source and credits">i</button>
   </nav>
@@ -94,6 +96,7 @@
   </div>
 </main>
 <script src="/startup-guard.js?v=1"></script>
-<script type="module" src="/app.js"></script>
+<script type="module" src="/app.js?v=wow1"></script>
+<script src="/wow-showcase.js?v=1"></script>
 </body>
 </html>

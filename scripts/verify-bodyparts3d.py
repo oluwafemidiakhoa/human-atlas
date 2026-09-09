@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Import gate: this file is also used to trigger the official BodyParts3D workflow.
 import argparse,gzip,hashlib,json
 from pathlib import Path
 ATTR='BodyParts3D, © The Database Center for Life Science licensed under CC Attribution 4.0 International'
